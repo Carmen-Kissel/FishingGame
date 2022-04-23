@@ -1,28 +1,30 @@
+import java.io.*;
 import java.util.Random;
 import java.awt.event.*;
+import java.util.Scanner;
 import javax.swing.*;
 
 /**
  * Work in progress
- *
+ * <p>
  * Eigenes JFrame anstatt Zeichenfensterklasse testen:
- *
+ * <p>
  * public class MainFrame extends javax.swing.JFrame {
- *
- *     public static void main(String[] args) { methode();}
- *
- *     public static void methode() {
- *             MainFrame frame = new MainFrame();
- *             frame.setTitle("Word Cloud");
- *             frame.setSize(1000, 620);
- *             frame.setResizable(true);
- *             frame.setLocation(50, 50);
- *             frame.setVisible(true);
- *     }
- *
+ * <p>
+ * public static void main(String[] args) { methode();}
+ * <p>
+ * public static void methode() {
+ * MainFrame frame = new MainFrame();
+ * frame.setTitle("Word Cloud");
+ * frame.setSize(1000, 620);
+ * frame.setResizable(true);
+ * frame.setLocation(50, 50);
+ * frame.setVisible(true);
+ * }
+ * <p>
  * }
  * (wichtig: frame.setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE); -> programm beenden wenn fenster geschlossen)
- *
+ * <p>
  * alternative: fxml
  */
 public class Field {
@@ -32,6 +34,10 @@ public class Field {
     private final Outwall oLeft;
 
     private Space[] spaces;
+
+    private BufferedReader reader;
+    private FileWriter writer;
+    private Scanner obj;
 
     private final FishingRod rod;
     private int rodColor;
@@ -56,6 +62,8 @@ public class Field {
     private JButton upgradeButton;
     private JButton colorButton;
     private JButton decorButton;
+    private JButton saveButton;
+    private JButton deleteButton;
     private JButton methodtest;
 
     private Thread fishing = new Thread() {
@@ -67,13 +75,13 @@ public class Field {
                     if (x == 0) {
                         //int y = rdm.nextInt(20);
                         //if(y != 0) {
-                            fishOnRod = true;
-                            setSpaceColor(372, 3);
-                            spaces[372].fill();
-                            Zeichenfenster.warte(1000);
-                            fishOnRod = false;
-                            setSpaceColor(372, 1);
-                            spaces[372].fill();
+                        fishOnRod = true;
+                        setSpaceColor(372, 3);
+                        spaces[372].fill();
+                        Zeichenfenster.warte(1000);
+                        fishOnRod = false;
+                        setSpaceColor(372, 1);
+                        spaces[372].fill();
                         //}
                     }
                     //System.out.println("Warte auf Fisch...");
@@ -91,7 +99,7 @@ public class Field {
                     if (fishOnRod) {
                         moveFishingRod();
                         Zeichenfenster.warte(500);
-                        if(isAutoFishing) {
+                        if (isAutoFishing) {
                             moveFishingRod();
                         }
                     }
@@ -124,6 +132,9 @@ public class Field {
         isAutoFishing = false;
         unlockedAutoCheat = false;
 
+        createScanner();
+        getStatsFromFile();
+
         spaces = new Space[400];
         createSpaces();
         createImageDefault();
@@ -131,6 +142,7 @@ public class Field {
 
         drawField();
         drawStats();
+        drawDecor();
 
         fishing.start();
         autoFishing.start();
@@ -139,7 +151,7 @@ public class Field {
         Zeichenfenster.gibFenster().komponenteHinzufuegen(moveButton, "unten");
         moveButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                if(isAutoFishing) {
+                if (isAutoFishing) {
                     isAutoFishing = false;
                 }
                 moveFishingRod();
@@ -184,15 +196,50 @@ public class Field {
         Zeichenfenster.gibFenster().komponenteHinzufuegen(autoButton, "unten");
         autoButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                if(unlockedAutoCheat) {
+                if (unlockedAutoCheat) {
                     performCheatSwitch();
-                }
-                else {
+                } else {
                     System.out.println("AutoFishing wurde noch nicht freigeschlalten");
                 }
             }
         });
+        saveButton = new JButton("Save");
+        Zeichenfenster.gibFenster().komponenteHinzufuegen(saveButton, "unten");
+        saveButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    editStatsFile();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+        deleteButton = new JButton("delete");
+        Zeichenfenster.gibFenster().komponenteHinzufuegen(deleteButton, "unten");
+        deleteButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                //rod = new FishingRod();
+                rodColor = 4;
+                fishOnRod = false;
+                caughtFishCount = 0;
+                currentFishAmount = 0;
+                soldFishCount = 0;
+                balance = 0;
+                baitAmount = 0;
+                decorLevel = 0;
 
+                autoFishingState = 0;
+                isAutoFishing = false;
+                unlockedAutoCheat = false;
+
+                try {
+                    editStatsFile();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+                System.exit(0);
+            }
+        });
 //        methodtest = new JButton(" [methodtest] ");
 //        Zeichenfenster.gibFenster().komponenteHinzufuegen(methodtest, "unten");
 //        methodtest.addActionListener(new ActionListener() {
@@ -200,6 +247,78 @@ public class Field {
 //
 //            }
 //        });
+    }
+
+    public void createScanner() {
+        try {
+            String current = new File("").getAbsolutePath();
+            File doc = new File(current + "\\gamefiles\\stats.txt");
+            obj = new Scanner(doc);
+        } catch (FileNotFoundException ignored) {
+        }
+    }
+
+    public int insertInt() {
+        String temp = obj.nextLine();
+        temp = temp.substring(temp.indexOf(" ") + 1);
+        return Integer.parseInt(temp); //caughtFishCount: 0
+    }
+
+    public void getStatsFromFile() {
+        caughtFishCount = insertInt();
+        currentFishAmount = insertInt();
+        balance = insertInt();
+        soldFishCount = insertInt();
+        baitAmount = insertInt();
+
+        String temp = obj.nextLine();
+        temp = temp.substring(temp.indexOf(" ") + 1); //true / false
+        unlockedAutoCheat = temp.equals("true");
+        System.out.println("unlockedAutoCheat: " + unlockedAutoCheat);
+
+        rodColor = insertInt();
+        caughtTrashCount = insertInt();
+        decorLevel = insertInt();
+    }
+
+    public void editStatsFile() throws IOException {
+        String current = new File("").getAbsolutePath();
+        File doc = new File(current + "\\gamefiles\\stats.txt");
+        reader = new BufferedReader(new FileReader(doc));
+
+        String content = "";
+
+        content = editSingleLine(caughtFishCount, content);
+        content = editSingleLine(currentFishAmount, content);
+        content = editSingleLine(balance, content);
+        content = editSingleLine(soldFishCount, content);
+        content = editSingleLine(baitAmount, content);
+        content = editSingleLine(unlockedAutoCheat, content);
+        content = editSingleLine(rodColor, content);
+        content = editSingleLine(caughtTrashCount, content);
+        content = editSingleLine(decorLevel, content);
+
+        writer = new FileWriter(doc);
+        writer.write(content);
+        writer.close();
+    }
+
+    public String editSingleLine(int stat, String content) throws IOException {
+        String line = reader.readLine();
+        //if(line != null) {
+        line = line.substring(0, line.indexOf(" ") + 1) + stat;
+        return content + line + System.lineSeparator();
+        //}
+        //return "Something went wrong";
+    }
+
+    public String editSingleLine(boolean stat, String content) throws IOException {
+        String line = reader.readLine();
+        //if(line != null) {
+        line = line.substring(0, line.indexOf(" ") + 1) + stat;
+        return content + line + System.lineSeparator();
+        //}
+        //return "Something went wrong";
     }
 
     public void startCheat() {
@@ -324,7 +443,7 @@ public class Field {
     }
 
     public void deleteRodImage() { //mit einem Image in FishingRod austauschen  -> Bild auf Hintergrund
-        if(!rod.isInWater()) {
+        if (!rod.isInWater()) {
             int color = 2; //gruen
             setSpaceColor(386, color);
             color = 1; //blau
@@ -346,12 +465,11 @@ public class Field {
             setSpaceColor(350, color);
 
             //fish etc
-            int[] x = new int[] {234, 235, 236, 252, 253, 254, 255, 256, 257, 273, 274, 275, 276, 277, 292, 293, 294, 295, 296, 297, 314, 315, 316};
+            int[] x = new int[]{234, 235, 236, 252, 253, 254, 255, 256, 257, 273, 274, 275, 276, 277, 292, 293, 294, 295, 296, 297, 314, 315, 316};
             for (int i = 0; i < x.length; i++) {
                 setSpaceColor(x[i], 1);
             }
-        }
-        else {
+        } else {
             int color = 2;
             setSpaceColor(386, color);
             color = 1;
@@ -395,15 +513,13 @@ public class Field {
             rod.setState(true);
             drawLowerField();
             updateStats();
-        }
-        else {
+        } else {
             createRodDefault();
             rod.setState(false);
             if (!fishOnRod) {
                 drawLowerField();
                 updateStats();
-            }
-            else {
+            } else {
                 int y = rdm.nextInt(10);
                 if (y == 9) { //not a fish
                     caughtTrashCount++;
@@ -411,8 +527,7 @@ public class Field {
                     for (int j : x) {
                         setSpaceColor(j, 0);
                     }
-                }
-                else {//System.out.println("Du hast einen Fisch gefangen!");
+                } else {//System.out.println("Du hast einen Fisch gefangen!");
                     caughtFishCount++;
                     currentFishAmount++;
                     if (!unlockedAutoCheat && caughtFishCount >= 3) {
@@ -444,23 +559,21 @@ public class Field {
         Zeichenfenster.gibFenster().zeichneText("Anzahl an Münzen: " + balance, 100, 160);
         Zeichenfenster.gibFenster().zeichneText("Verkaufte Fische: " + soldFishCount, 100, 190);
         Zeichenfenster.gibFenster().zeichneText("Köderstärke: " + baitAmount, 500, 100);
-        if(!unlockedAutoCheat) {
+        if (!unlockedAutoCheat) {
             Zeichenfenster.gibFenster().zeichneText("Autofishing: locked", 500, 130);
             Zeichenfenster.gibFenster().zeichneText("Autofishing: disabled", 500, 160);
-        }
-        else {
+        } else {
             Zeichenfenster.gibFenster().zeichneText("Autofishing: unlocked", 500, 130);
-            if(isAutoFishing) {
+            if (isAutoFishing) {
                 Zeichenfenster.gibFenster().zeichneText("Autofishing: enabled", 500, 160);
-            }
-            else {
+            } else {
                 Zeichenfenster.gibFenster().zeichneText("Autofishing: disabled", 500, 160);
             }
         }
     }
 
     public void updateStats() { //causes lags (-> Zeichenfenster.gibFenster.loescheRechteck?)
-        if(decorLevel == 0) {
+        if (decorLevel == 0) {
             Zeichenfenster.gibFenster().fuelleRechteck(199, 90, 150, 13, 3); //Fische gefangen
             Zeichenfenster.gibFenster().fuelleRechteck(249, 120, 150, 13, 3); // Aktuelle Anzahl an Fischen
             Zeichenfenster.gibFenster().fuelleRechteck(201, 150, 150, 13, 3); // Anzahl an Münzen
@@ -469,8 +582,7 @@ public class Field {
             Zeichenfenster.gibFenster().fuelleRechteck(565, 120, 150, 13, 3); // Autofishing locked
             Zeichenfenster.gibFenster().fuelleRechteck(565, 150, 150, 13, 3); // Autofishing disabled
             drawStats();
-        }
-        else {
+        } else {
             Zeichenfenster.gibFenster().fuelleRechteck(199, 90, 150, 13, 8); //Fische gefangen
             Zeichenfenster.gibFenster().fuelleRechteck(249, 120, 70, 13, 8); // Aktuelle Anzahl an Fischen
             Zeichenfenster.gibFenster().fuelleRechteck(201, 150, 119, 13, 8); // Anzahl an Münzen
@@ -493,6 +605,7 @@ public class Field {
             updateStats();
         }
     }
+
     public void sellAllFish() {
         if (currentFishAmount < 1) {
             System.out.println("Du hast keine Fische die du verkaufen kannst!");
@@ -529,10 +642,9 @@ public class Field {
                 case 6 -> rodColor = 10;
                 case 10 -> rodColor = 4;
             }
-            if(!rod.isInWater()) {
+            if (!rod.isInWater()) {
                 createRodDefault();
-            }
-            else {
+            } else {
                 int color = rodColor;
                 setSpaceColor(386, color);
                 setSpaceColor(366, color);
@@ -553,73 +665,95 @@ public class Field {
             drawLowerField();
             updateStats();
             System.out.println("Farbe gewechselt!");
-        }
-        else {
+        } else {
             System.out.println("Du hast nicht genug Geld!");
         }
     }
 
     public void buyDecor() {
         switch (decorLevel) {
-            case 0: buyClouds(); break;
-            case 1: buyDuck(); break;
+            case 0:
+                buyClouds();
+                break;
+            case 1:
+                buyDuck();
+                break;
+        }
+    }
+
+    public void drawDecor() {
+        switch (decorLevel) {
+            case 0:
+                break;
+            case 1:
+                drawClouds();
+                break;
+            case 2:
+                drawClouds();
+                drawDuck();
+                break;
         }
     }
 
     public void buyClouds() { //nr 8
-        if(balance >= 10) {
+        if (balance >= 10) {
             balance = balance - 10;
-
-            setSpaceColor(4, 8); //cloud 1 //in den Hintergrund mit einfuegen
-            setSpaceColor(5, 8);
-            setSpaceColor(23, 8);
-            setSpaceColor(24, 8);
-            setSpaceColor(25, 8);
-            setSpaceColor(26, 8);
-            setSpaceColor(27, 8);
-            setSpaceColor(44, 8);
-            setSpaceColor(45, 8);
-            setSpaceColor(46, 8);
-
-            for(int i = 31; i < 36; i++) { //cloud 2
-                setSpaceColor(i, 8);
-                setSpaceColor(i+20, 8);
-            }
-            setSpaceColor(50, 8);
-            setSpaceColor(72, 8);
-            setSpaceColor(73, 8);
-
             decorLevel++;
 
-            drawField();
-            updateStats();
-        }
-        else {
+            drawClouds();
+        } else {
             System.out.println("Du hast nicht genug Geld!");
         }
     }
 
+    public void drawClouds() {
+        setSpaceColor(4, 8); //cloud 1 //in den Hintergrund mit einfuegen
+        setSpaceColor(5, 8);
+        setSpaceColor(23, 8);
+        setSpaceColor(24, 8);
+        setSpaceColor(25, 8);
+        setSpaceColor(26, 8);
+        setSpaceColor(27, 8);
+        setSpaceColor(44, 8);
+        setSpaceColor(45, 8);
+        setSpaceColor(46, 8);
+
+        for (int i = 31; i < 36; i++) { //cloud 2
+            setSpaceColor(i, 8);
+            setSpaceColor(i + 20, 8);
+        }
+        setSpaceColor(50, 8);
+        setSpaceColor(72, 8);
+        setSpaceColor(73, 8);
+
+        drawField();
+        updateStats();
+    }
+
     public void buyDuck() { //gelb 6, rot 4
-        if(balance >= 15) {
+        if (balance >= 15) {
             balance = balance - 15;
 
-            for(int i = 222; i < 224; i++) {
-                setSpaceColor(i, 6);
-                setSpaceColor(i+20, 6);
-            }
-            for(int i = 262; i < 266; i++) {
-                setSpaceColor(i, 6);
-                setSpaceColor(i+20, 6);
-            }
-            setSpaceColor(241, 4);
+            drawDuck();
 
             decorLevel++;
-
-            drawLowerField();
-            updateStats();
-        }
-        else {
+        } else {
             System.out.println("Du hast nicht genug Geld!");
         }
+    }
+
+    public void drawDuck() {
+        for (int i = 222; i < 224; i++) {
+            setSpaceColor(i, 6);
+            setSpaceColor(i + 20, 6);
+        }
+        for (int i = 262; i < 266; i++) {
+            setSpaceColor(i, 6);
+            setSpaceColor(i + 20, 6);
+        }
+        setSpaceColor(241, 4);
+
+        drawLowerField();
+        updateStats();
     }
 }
