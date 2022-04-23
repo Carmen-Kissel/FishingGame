@@ -1,0 +1,9 @@
+caughtFishCount: 0
+currentFishAmount: 0
+balance: 0
+soldFishCount: 0
+baitAmount: 0
+unlockedAutoCheat: false
+rodColor: 4
+caughtTrashCount: 0
+decorLevel: 0
